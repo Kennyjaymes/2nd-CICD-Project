@@ -49,6 +49,11 @@ terraform apply -auto-approve tfplan
 `k8s-deployment.yaml` is the application manifest with placeholders:
 - `REPLACE_WITH_IMAGE` gets replaced by the GitHub workflow to `$ECR_REPO:latest`.
 
+## Application
+
+- `Dockerfile`: Simple Nginx-based container serving static files.
+- `app/index.html`: Basic HTML page displayed by the app.
+
 ## Slack Alerts
 
 Pipeline uses `curl` to send standard text notifications to the Slack webhook in:

@@ -41,7 +41,7 @@ module "eks" {
       desired_capacity = 2
       min_capacity     = 1
       max_capacity     = 3
-      instance_type    = "t3.medium"
+      instance_type    = "t2.micro"
       key_name         = var.ec2_key_pair_name
     }
   }
@@ -84,7 +84,7 @@ resource "aws_security_group" "ec2_sg" {
 
 resource "aws_instance" "app_ec2" {
   ami                    = data.aws_ami.amazon_linux2.id
-  instance_type          = var.ec2_instance_type
+  instance_type          = "t2.micro"
   subnet_id              = data.aws_subnet_ids.default.ids[0]
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   key_name               = var.ec2_key_pair_name

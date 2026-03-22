@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "AWS region"
   type        = string
-  default     = "us-east-1"
+  default     = "eu-west-1"  # Changed from us-east-1 for EU region
 }
 
 variable "project_name" {
@@ -37,7 +37,7 @@ variable "eks_version" {
 variable "ec2_instance_type" {
   description = "EC2 instance type"
   type        = string
-  default     = "t3.micro"
+  default     = "t3.small"  # Changed from t3.micro for better performance
 }
 
 variable "ec2_key_pair_name" {
