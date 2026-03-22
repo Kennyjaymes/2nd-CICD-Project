@@ -142,12 +142,14 @@ pipeline {
     post {
         success {
             script {
-                sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] Pipeline completed successfully for ${env.JOB_NAME}@${env.BUILD_NUMBER}\"}' ${SLACK_WEBHOOK_URL}"
+                def slackUrl = credentials('SLACK_WEBHOOK_URL')
+                sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] Pipeline completed successfully for ${env.JOB_NAME}@${env.BUILD_NUMBER}\"}' ${slackUrl}"
             }
         }
         failure {
             script {
-                sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] Pipeline failed for ${env.JOB_NAME}@${env.BUILD_NUMBER}\"}' ${SLACK_WEBHOOK_URL}"
+                def slackUrl = credentials('SLACK_WEBHOOK_URL')
+                sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] Pipeline failed for ${env.JOB_NAME}@${env.BUILD_NUMBER}\"}' ${slackUrl}"
             }
         }
     }
