@@ -1,0 +1,173 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  terraform:
+    name: Terraform and Infrastructure
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Notify Slack – Terraform started
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"[CI/CD] Terraform stage started for ${GITHUB_REPOSITORY}@${GITHUB_SHA}"}' ${SLACK_WEBHOOK_URL}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          cli_config_credentials_token: ${{ secrets.HASHICORP_CLOUD_TOKEN }}
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: terraform
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Notify Slack – Terraform success
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"[CI/CD] Terraform succeed for ${GITHUB_REPOSITORY}@${GITHUB_SHA}. ECR: $(terraform -chdir=terraform output -raw ecr_repository_url), EKS cluster: $(terraform -chdir=terraform output -raw eks_cluster_name)"}' ${SLACK_WEBHOOK_URL}
+
+      - name: Notify Slack – Terraform failed
+        if: failure()
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"[CI/CD] Terraform failed for ${GITHUB_REPOSITORY}@${GITHUB_SHA}."}' ${SLACK_WEBHOOK_URL}
+
+      - name: Set outputs for next jobs
+        id: infra
+        run: |
+          echo "ECR_URL=$(terraform -chdir=terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
+          echo "EKS_CLUSTER=$(terraform -chdir=terraform output -raw eks_cluster_name)" >> $GITHUB_OUTPUT
+          echo "EKS_ENDPOINT=$(terraform -chdir=terraform output -raw eks_cluster_endpoint)" >> $GITHUB_OUTPUT
+          echo "EC2_IP=$(terraform -chdir=terraform output -raw ec2_public_ip)" >> $GITHUB_OUTPUT
+
+  build_and_push:
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+    needs: terraform
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      ECR_REPO: ${{ needs.terraform.outputs.ECR_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Notify Slack – ECR build started
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"[CI/CD] Docker build+push started."}' ${SLACK_WEBHOOK_URL}
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: github-actions
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
+
+      - name: Build image
+        run: |
+          docker build -t $ECR_REPO:latest .
+
+      - name: Push image
+        run: |
+          docker push $ECR_REPO:latest
+
+      - name: Notify Slack – ECR success
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"[CI/CD] Docker image pushed to $ECR_REPO"}' ${SLACK_WEBHOOK_URL}
+
+      - name: Notify Slack – ECR failed
+        if: failure()
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"[CI/CD] Docker build/push failed"}' ${SLACK_WEBHOOK_URL}
+
+  deploy_eks:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: build_and_push
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      ECR_REPO: ${{ needs.terraform.outputs.ECR_URL }}
+      EKS_CLUSTER: ${{ needs.terraform.outputs.EKS_CLUSTER }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Notify Slack – EKS deploy started
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"[CI/CD] EKS deploy started"}' ${SLACK_WEBHOOK_URL}
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: github-actions
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: latest
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name $EKS_CLUSTER --region $AWS_REGION
+
+      - name: Deploy Kubernetes manifests
+        run: |
+          sed -e "s|REPLACE_WITH_IMAGE|$ECR_REPO:latest|g" k8s-deployment.yaml > k8s-deployment-rendered.yaml
+          kubectl apply -f k8s-deployment-rendered.yaml
+
+      - name: Notify Slack – EKS success
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"[CI/CD] EKS deployment complete"}' ${SLACK_WEBHOOK_URL}
+
+      - name: Notify Slack – EKS failed
+        if: failure()
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"[CI/CD] EKS deployment failed"}' ${SLACK_WEBHOOK_URL}
+
+  verify_ec2:
+    name: Verify EC2 App
+    runs-on: ubuntu-latest
+    needs: deploy_eks
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      EC2_IP: ${{ needs.terraform.outputs.EC2_IP }}
+    steps:
+      - name: Ping EC2
+        run: |
+          echo "Checking EC2 public IP: $EC2_IP"
+          curl --retry 5 --retry-delay 10 --max-time 10 http://$EC2_IP || true
+
+      - name: Send Slack notification from EC2 check
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --retry 5 --retry-delay 10 --max-time 10 http://$EC2_IP || true)
+          if [ "$HTTP_CODE" = "200" ]; then
+            STATUS="EC2 app reachable"
+          else
+            STATUS="EC2 app unreachable (code=$HTTP_CODE)"
+          fi
+          curl -X POST -H 'Content-type: application/json' --data "{'text':'[CI/CD] $STATUS at http://$EC2_IP'}" ${SLACK_WEBHOOK_URL}
