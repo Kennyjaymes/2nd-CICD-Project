@@ -1,4 +1,4 @@
-FROM nginx:alpine
+FROM nginx:1.26-alpine
 
 # Copy the app files to nginx html directory
 COPY app/ /usr/share/nginx/html/

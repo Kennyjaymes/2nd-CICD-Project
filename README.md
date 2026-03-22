@@ -23,6 +23,45 @@ This repository demonstrates a complete CI/CD pipeline that creates and deploys 
    - `verify_ec2` job: check EC2 app endpoint
 3. Slack notifications are sent for start/success/failure events in each job.
 
+## CI/CD Options
+
+This project supports two CI/CD platforms:
+
+### Option 1: GitHub Actions (Default)
+- Uses `.github/workflows/cicd.yml`
+- Fully automated on GitHub's infrastructure
+- Requires GitHub repository secrets
+
+### Option 2: Jenkins
+- Uses `Jenkinsfile` for pipeline definition
+- Requires a self-hosted Jenkins server
+- Uses Jenkins credentials for AWS and Slack
+
+## Jenkins Setup
+
+1. **Install Jenkins** on a server (e.g., EC2 instance) with Docker, AWS CLI, Terraform, kubectl installed.
+
+2. **Install Plugins**:
+   - Pipeline
+   - AWS Credentials
+   - Docker Pipeline
+
+3. **Configure Credentials** in Jenkins:
+   - `AWS_ACCESS_KEY_ID`: AWS access key
+   - `AWS_SECRET_ACCESS_KEY`: AWS secret key
+   - `AWS_REGION`: e.g., `eu-west-1`
+   - `SLACK_WEBHOOK_URL`: Slack webhook URL
+
+4. **Create Pipeline Job**:
+   - New Item > Pipeline
+   - Pipeline script from SCM
+   - SCM: Git
+   - Repository URL: Your repo
+   - Script Path: `Jenkinsfile`
+
+5. **Trigger Builds**:
+   - Poll SCM or webhook for pushes to `main`
+
 ## Setup
 
 1. Create and commit an SSH key pair or set `ec2_key_pair_name` to an existing key.
