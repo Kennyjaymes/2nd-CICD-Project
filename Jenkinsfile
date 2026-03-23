@@ -12,7 +12,7 @@ pipeline {
         stage('Notify Slack - Terraform Start') {
             steps {
                 script {
-                    sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] Terraform stage started for ${env.JOB_NAME}@${env.BUILD_NUMBER}\"}' ${SLACK_WEBHOOK_URL}"
+                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Terraform stage started for \$env:JOB_NAME@\$env:BUILD_NUMBER\"}'"
                 }
             }
         }
@@ -20,7 +20,7 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 dir('terraform') {
-                    sh 'terraform init'
+                    powershell 'terraform init'
                 }
             }
         }
@@ -28,7 +28,7 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 dir('terraform') {
-                    sh 'terraform plan -out=tfplan'
+                    powershell 'terraform plan -out=tfplan'
                 }
             }
         }
@@ -36,7 +36,7 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 dir('terraform') {
-                    sh 'terraform apply -input=false -auto-approve tfplan'
+                    powershell 'terraform apply -input=false -auto-approve tfplan'
                 }
             }
         }
@@ -45,10 +45,10 @@ pipeline {
             steps {
                 dir('terraform') {
                     script {
-                        env.ECR_URL = sh(script: 'terraform output -raw ecr_repository_url', returnStdout: true).trim()
-                        env.EKS_CLUSTER = sh(script: 'terraform output -raw eks_cluster_name', returnStdout: true).trim()
-                        env.EKS_ENDPOINT = sh(script: 'terraform output -raw eks_cluster_endpoint', returnStdout: true).trim()
-                        env.EC2_IP = sh(script: 'terraform output -raw ec2_public_ip', returnStdout: true).trim()
+                        env.ECR_URL = powershell(script: 'terraform output -raw ecr_repository_url', returnStdout: true).trim()
+                        env.EKS_CLUSTER = powershell(script: 'terraform output -raw eks_cluster_name', returnStdout: true).trim()
+                        env.EKS_ENDPOINT = powershell(script: 'terraform output -raw eks_cluster_endpoint', returnStdout: true).trim()
+                        env.EC2_IP = powershell(script: 'terraform output -raw ec2_public_ip', returnStdout: true).trim()
                     }
                 }
             }
@@ -57,7 +57,7 @@ pipeline {
         stage('Notify Slack - Terraform Success') {
             steps {
                 script {
-                    sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] Terraform succeed. ECR: ${env.ECR_URL}, EKS cluster: ${env.EKS_CLUSTER}\"}' ${SLACK_WEBHOOK_URL}"
+                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Terraform succeed. ECR: \$env:ECR_URL, EKS cluster: \$env:EKS_CLUSTER\"}'"
                 }
             }
         }
@@ -65,33 +65,33 @@ pipeline {
         stage('Notify Slack - Build Start') {
             steps {
                 script {
-                    sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] Docker build+push started.\"}' ${SLACK_WEBHOOK_URL}"
+                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Docker build+push started.\"}'"
                 }
             }
         }
 
         stage('Login to ECR') {
             steps {
-                sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${env.ECR_URL}"
+                powershell "aws ecr get-login-password --region \$env:AWS_REGION | docker login --username AWS --password-stdin \$env:ECR_URL"
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${env.ECR_URL}:latest ."
+                powershell "docker build -t \$env:ECR_URL:latest ."
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                sh "docker push ${env.ECR_URL}:latest"
+                powershell "docker push \$env:ECR_URL:latest"
             }
         }
 
         stage('Notify Slack - Build Success') {
             steps {
                 script {
-                    sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] Docker image pushed to ${env.ECR_URL}\"}' ${SLACK_WEBHOOK_URL}"
+                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Docker image pushed to \$env:ECR_URL\"}'"
                 }
             }
         }
@@ -99,28 +99,28 @@ pipeline {
         stage('Notify Slack - EKS Deploy Start') {
             steps {
                 script {
-                    sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] EKS deploy started\"}' ${SLACK_WEBHOOK_URL}"
+                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] EKS deploy started\"}'"
                 }
             }
         }
 
         stage('Update Kubeconfig') {
             steps {
-                sh "aws eks update-kubeconfig --name ${env.EKS_CLUSTER} --region ${AWS_REGION}"
+                powershell "aws eks update-kubeconfig --name \$env:EKS_CLUSTER --region \$env:AWS_REGION"
             }
         }
 
         stage('Deploy to EKS') {
             steps {
-                sh "sed -e 's|REPLACE_WITH_IMAGE|${env.ECR_URL}:latest|g' k8s-deployment.yaml > k8s-deployment-rendered.yaml"
-                sh "kubectl apply -f k8s-deployment-rendered.yaml"
+                powershell "(Get-Content k8s-deployment.yaml) -replace 'REPLACE_WITH_IMAGE', \"\$env:ECR_URL:latest\" | Set-Content k8s-deployment-rendered.yaml"
+                powershell "kubectl apply -f k8s-deployment-rendered.yaml"
             }
         }
 
         stage('Notify Slack - EKS Success') {
             steps {
                 script {
-                    sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] EKS deployment complete\"}' ${SLACK_WEBHOOK_URL}"
+                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] EKS deployment complete\"}'"
                 }
             }
         }
@@ -128,11 +128,11 @@ pipeline {
         stage('Verify EC2') {
             steps {
                 script {
-                    def response = sh(script: "curl -s -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 10 --max-time 10 http://${env.EC2_IP} || echo '000'", returnStdout: true).trim()
+                    def response = powershell(script: "try { \$response = Invoke-WebRequest -Uri \"http://\$env:EC2_IP\" -TimeoutSec 10; \$response.StatusCode } catch { 000 }", returnStdout: true).trim()
                     if (response == '200') {
-                        sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] EC2 app reachable at http://${env.EC2_IP}\"}' ${SLACK_WEBHOOK_URL}"
+                        powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] EC2 app reachable at http://\$env:EC2_IP\"}'"
                     } else {
-                        sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] EC2 app unreachable (code=${response}) at http://${env.EC2_IP}\"}' ${SLACK_WEBHOOK_URL}"
+                        powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] EC2 app unreachable (code=\$response) at http://\$env:EC2_IP\"}'"
                     }
                 }
             }
@@ -143,13 +143,13 @@ pipeline {
         success {
             script {
                 def slackUrl = credentials('SLACK_WEBHOOK_URL')
-                sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] Pipeline completed successfully for ${env.JOB_NAME}@${env.BUILD_NUMBER}\"}' ${slackUrl}"
+                powershell "Invoke-WebRequest -Uri \$slackUrl -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Pipeline completed successfully for \$env:JOB_NAME@\$env:BUILD_NUMBER\"}'"
             }
         }
         failure {
             script {
                 def slackUrl = credentials('SLACK_WEBHOOK_URL')
-                sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"[Jenkins CI/CD] Pipeline failed for ${env.JOB_NAME}@${env.BUILD_NUMBER}\"}' ${slackUrl}"
+                powershell "Invoke-WebRequest -Uri \$slackUrl -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Pipeline failed for \$env:JOB_NAME@\$env:BUILD_NUMBER\"}'"
             }
         }
     }
