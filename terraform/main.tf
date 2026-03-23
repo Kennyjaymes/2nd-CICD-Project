@@ -6,8 +6,11 @@ data "aws_vpc" "default" {
   default = true
 }
 
-data "aws_subnet_ids" "default" {
-  vpc_id = data.aws_vpc.default.id
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
 }
 
 data "aws_ami" "amazon_linux2" {
@@ -29,13 +32,13 @@ resource "aws_ecr_repository" "app_repo" {
 }
 
 module "eks" {
-  source          = "terraform-aws-modules/eks/aws"
-  version         = "~> 21.0"
-  cluster_name    = var.eks_cluster_name
-  cluster_version = var.eks_version
+  source             = "terraform-aws-modules/eks/aws"
+  version            = "~> 21.0"
+  name               = var.eks_cluster_name
+  kubernetes_version = var.eks_version
 
   vpc_id     = data.aws_vpc.default.id
-  subnet_ids = data.aws_subnet_ids.default.ids
+  subnet_ids = data.aws_subnets.default.ids
 
   eks_managed_node_groups = {
     on_demand = {
@@ -86,7 +89,7 @@ resource "aws_security_group" "ec2_sg" {
 resource "aws_instance" "app_ec2" {
   ami                    = data.aws_ami.amazon_linux2.id
   instance_type          = "t2.micro"
-  subnet_id              = data.aws_subnet_ids.default.ids[0]
+  subnet_id              = data.aws_subnets.default.ids[0]
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   key_name               = var.ec2_key_pair_name
 

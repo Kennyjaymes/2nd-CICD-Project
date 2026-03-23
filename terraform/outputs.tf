@@ -14,8 +14,8 @@ output "eks_cluster_endpoint" {
 }
 
 output "eks_cluster_kubeconfig" {
-  value       = module.eks.kubeconfig
-  description = "Kubeconfig to connect to the EKS cluster"
+  value       = module.eks.cluster_endpoint
+  description = "EKS cluster API endpoint (kubeconfig data not directly exposed in this module output)"
   sensitive   = true
 }
 
