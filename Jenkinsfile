@@ -12,7 +12,7 @@ pipeline {
         stage('Notify Slack - Terraform Start') {
             steps {
                 script {
-                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Terraform stage started for \$env:JOB_NAME@\$env:BUILD_NUMBER\"}'"
+                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Terraform stage started for \$env:JOB_NAME@\$env:BUILD_NUMBER\"}' -UseBasicParsing"
                 }
             }
         }
@@ -57,7 +57,7 @@ pipeline {
         stage('Notify Slack - Terraform Success') {
             steps {
                 script {
-                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Terraform succeed. ECR: \$env:ECR_URL, EKS cluster: \$env:EKS_CLUSTER\"}'"
+                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Terraform succeed. ECR: \$env:ECR_URL, EKS cluster: \$env:EKS_CLUSTER\"}' -UseBasicParsing"
                 }
             }
         }
@@ -65,7 +65,7 @@ pipeline {
         stage('Notify Slack - Build Start') {
             steps {
                 script {
-                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Docker build+push started.\"}'"
+                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Docker build+push started.\"}' -UseBasicParsing"
                 }
             }
         }
@@ -91,7 +91,7 @@ pipeline {
         stage('Notify Slack - Build Success') {
             steps {
                 script {
-                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Docker image pushed to \$env:ECR_URL\"}'"
+                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Docker image pushed to \$env:ECR_URL\"}' -UseBasicParsing"
                 }
             }
         }
@@ -99,7 +99,7 @@ pipeline {
         stage('Notify Slack - EKS Deploy Start') {
             steps {
                 script {
-                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] EKS deploy started\"}'"
+                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] EKS deploy started\"}' -UseBasicParsing"
                 }
             }
         }
@@ -120,7 +120,7 @@ pipeline {
         stage('Notify Slack - EKS Success') {
             steps {
                 script {
-                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] EKS deployment complete\"}'"
+                    powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] EKS deployment complete\"}' -UseBasicParsing"
                 }
             }
         }
@@ -128,11 +128,11 @@ pipeline {
         stage('Verify EC2') {
             steps {
                 script {
-                    def response = powershell(script: "try { \$response = Invoke-WebRequest -Uri \"http://\$env:EC2_IP\" -TimeoutSec 10; \$response.StatusCode } catch { 000 }", returnStdout: true).trim()
+                    def response = powershell(script: "try { \$response = Invoke-WebRequest -Uri \"http://\$env:EC2_IP\" -TimeoutSec 10 -UseBasicParsing; \$response.StatusCode } catch { 000 }", returnStdout: true).trim()
                     if (response == '200') {
-                        powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] EC2 app reachable at http://\$env:EC2_IP\"}'"
+                        powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] EC2 app reachable at http://\$env:EC2_IP\"}' -UseBasicParsing"
                     } else {
-                        powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] EC2 app unreachable (code=\$response) at http://\$env:EC2_IP\"}'"
+                        powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] EC2 app unreachable (code=\$response) at http://\$env:EC2_IP\"}' -UseBasicParsing"
                     }
                 }
             }
@@ -142,14 +142,12 @@ pipeline {
     post {
         success {
             script {
-                def slackUrl = credentials('SLACK_WEBHOOK_URL')
-                powershell "Invoke-WebRequest -Uri \$slackUrl -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Pipeline completed successfully for \$env:JOB_NAME@\$env:BUILD_NUMBER\"}'"
+                powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Pipeline completed successfully for \$env:JOB_NAME@\$env:BUILD_NUMBER\"}' -UseBasicParsing"
             }
         }
         failure {
             script {
-                def slackUrl = credentials('SLACK_WEBHOOK_URL')
-                powershell "Invoke-WebRequest -Uri \$slackUrl -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Pipeline failed for \$env:JOB_NAME@\$env:BUILD_NUMBER\"}'"
+                powershell "Invoke-WebRequest -Uri \$env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\"text\":\"[Jenkins CI/CD] Pipeline failed for \$env:JOB_NAME@\$env:BUILD_NUMBER\"}' -UseBasicParsing"
             }
         }
     }
