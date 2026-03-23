@@ -30,19 +30,20 @@ resource "aws_ecr_repository" "app_repo" {
 
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
+  version         = "~> 21.0"
   cluster_name    = var.eks_cluster_name
   cluster_version = var.eks_version
 
   vpc_id     = data.aws_vpc.default.id
   subnet_ids = data.aws_subnet_ids.default.ids
 
-  node_groups = {
+  eks_managed_node_groups = {
     on_demand = {
-      desired_capacity = 2
-      min_capacity     = 1
-      max_capacity     = 3
-      instance_type    = "t2.micro"
-      key_name         = var.ec2_key_pair_name
+      min_size       = 1
+      max_size       = 3
+      desired_size   = 2
+      instance_types = ["t2.micro"]
+      key_name       = var.ec2_key_pair_name
     }
   }
 
