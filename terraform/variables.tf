@@ -45,3 +45,9 @@ variable "ec2_key_pair_name" {
   type        = string
   default     = "my-cicd-keypair"
 }
+
+variable "ec2_key_pair_public_key_path" {
+  description = "Path to local public key file used to create AWS key pair"
+  type        = string
+  default     = "../my-cicd-keypair.pub"
+}

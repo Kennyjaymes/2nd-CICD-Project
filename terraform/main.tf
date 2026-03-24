@@ -2,17 +2,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-data "aws_vpc" "default" {
-  default = true
-}
-
-data "aws_subnets" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
-}
-
 data "aws_ami" "amazon_linux2" {
   most_recent = true
   owners      = ["amazon"]
@@ -37,15 +26,18 @@ module "eks" {
   name               = var.eks_cluster_name
   kubernetes_version = var.eks_version
 
-  vpc_id     = data.aws_vpc.default.id
-  subnet_ids = data.aws_subnets.default.ids
+  create_vpc = true
+  vpc_cidr   = "10.0.0.0/16"
+  azs        = ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 
   eks_managed_node_groups = {
     on_demand = {
       min_size       = 1
       max_size       = 3
       desired_size   = 2
-      instance_types = ["t2.micro"]
+      instance_types = [var.ec2_instance_type]
       key_name       = var.ec2_key_pair_name
     }
   }
@@ -58,7 +50,7 @@ module "eks" {
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.project_name}-ec2-sg"
   description = "Allow HTTP and SSH to EC2"
-  vpc_id      = data.aws_vpc.default.id
+  vpc_id      = module.eks.vpc_id
 
   ingress {
     from_port   = 22
@@ -88,8 +80,8 @@ resource "aws_security_group" "ec2_sg" {
 
 resource "aws_instance" "app_ec2" {
   ami                    = data.aws_ami.amazon_linux2.id
-  instance_type          = "t2.micro"
-  subnet_id              = data.aws_subnets.default.ids[0]
+  instance_type          = var.ec2_instance_type
+  subnet_id              = module.eks.public_subnets[0]
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   key_name               = var.ec2_key_pair_name
 
