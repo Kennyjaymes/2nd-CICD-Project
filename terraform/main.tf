@@ -58,7 +58,7 @@ module "eks" {
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.project_name}-ec2-sg"
   description = "Allow HTTP and SSH to EC2"
-  vpc_id      = module.eks.vpc_id
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
     from_port   = 22
