@@ -20,7 +20,7 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 dir('terraform') {
-                    powershell 'cmd /c "echo yes | terraform init -migrate-state"'
+                    powershell 'terraform init'
                 }
             }
         }
