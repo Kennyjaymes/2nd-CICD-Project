@@ -26,6 +26,7 @@ data "aws_ami" "amazon_linux2" {
 resource "aws_ecr_repository" "app_repo" {
   name                 = var.ecr_repo_name
   image_tag_mutability = "MUTABLE"
+
   tags = {
     Environment = var.environment
   }
@@ -58,7 +59,7 @@ module "eks" {
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.project_name}-ec2-sg"
   description = "Allow HTTP and SSH to EC2"
-  vpc_id      = module.vpc.vpc_id
+  vpc_id      = data.aws_vpc.default.id   # ✅ FIXED
 
   ingress {
     from_port   = 22
@@ -89,7 +90,7 @@ resource "aws_security_group" "ec2_sg" {
 resource "aws_instance" "app_ec2" {
   ami                    = data.aws_ami.amazon_linux2.id
   instance_type          = var.ec2_instance_type
-  subnet_id              = module.eks.public_subnets[0]
+  subnet_id              = data.aws_subnets.default.ids[0]   # ✅ FIXED
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   key_name               = var.ec2_key_pair_name
 
@@ -100,7 +101,7 @@ resource "aws_instance" "app_ec2" {
               service docker start
               usermod -a -G docker ec2-user
 
-              $(aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${aws_ecr_repository.app_repo.repository_url})
+              aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${aws_ecr_repository.app_repo.repository_url}
               docker pull ${aws_ecr_repository.app_repo.repository_url}:latest || true
               docker run -d -p 80:80 --name app ${aws_ecr_repository.app_repo.repository_url}:latest || true
               EOF
