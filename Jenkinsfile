@@ -20,7 +20,7 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 dir('terraform') {
-                    powershell 'terraform init -reconfigure'
+                    powershell 'terraform init -migrate-state'
                 }
             }
         }
