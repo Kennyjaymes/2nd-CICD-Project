@@ -1,0 +1,35 @@
+// ============================================================
+// BOOTSTRAP PIPELINE - Run this ONE TIME only
+// It creates the S3 bucket + DynamoDB table for remote state.
+// After it succeeds, use the main Jenkinsfile going forward.
+// ============================================================
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION            = credentials('AWS_REGION')
+        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+    }
+
+    stages {
+        stage('Bootstrap - Create Remote State Backend') {
+            steps {
+                dir('terraform/bootstrap') {
+                    powershell 'terraform init'
+                    powershell 'terraform apply -auto-approve'
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Bootstrap complete! S3 bucket and DynamoDB table created.'
+            echo 'You can now run the main pipeline.'
+        }
+        failure {
+            echo 'Bootstrap failed. Check the logs above.'
+        }
+    }
+}
