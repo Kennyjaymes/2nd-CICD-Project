@@ -25,6 +25,14 @@ pipeline {
             }
         }
 
+        stage('Import Missing Resources') {
+            steps {
+                dir('terraform') {
+                    powershell './import_state.ps1'
+                }
+            }
+        }
+
         stage('Terraform Plan') {
             steps {
                 dir('terraform') {
