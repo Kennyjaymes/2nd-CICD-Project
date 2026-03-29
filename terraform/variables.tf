@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "project_name" {
   description = "Project prefix"
   type        = string
-  default     = "2nd-cicd-project"
+  default     = "2nd-cicd-project-v2"
 }
 
 variable "environment" {
